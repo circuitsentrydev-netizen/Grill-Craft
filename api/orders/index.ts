@@ -13,7 +13,7 @@ import {
 import type { ApiRequest, ApiResponse } from "../lib/http";
 
 const flavours = new Set([
-  "Mozambican Portuguese",
+  "Peri Peri",
   "Spicy Texan",
   "Sweet Moroccan",
 ]);

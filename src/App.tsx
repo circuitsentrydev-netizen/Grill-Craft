@@ -5,7 +5,7 @@ import AdminPage from '@/pages/admin';
 import NotFound from '@/pages/not-found';
 import { apiRequest } from '@/lib/api';
 
-const flavours = ['Mozambican Portuguese', 'Spicy Texan', 'Sweet Moroccan'];
+const flavours = ['Peri Peri', 'Spicy Texan', 'Sweet Moroccan'];
 
 type Deal = {
   id: string;
