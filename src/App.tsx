@@ -1,13 +1,55 @@
-import { useEffect, useState } from 'react';
-import { ArrowDown, ArrowUpRight, Flame, Menu, MessageCircle, X } from 'lucide-react';
+import { useEffect, useState, type FormEvent } from 'react';
+import { ArrowDown, ArrowUpRight, Check, Flame, LoaderCircle, Menu, MessageCircle, X } from 'lucide-react';
+import { Route, Switch } from 'wouter';
+import AdminPage from '@/pages/admin';
+import NotFound from '@/pages/not-found';
+import { apiRequest } from '@/lib/api';
 
 const flavours = ['Mozambican Portuguese', 'Spicy Texan', 'Sweet Moroccan'];
 
-function App() {
+type Deal = {
+  id: string;
+  title: string;
+  description: string;
+  priceRand: number;
+  originalPriceRand: number | null;
+  imageUrl: string | null;
+};
+
+type OrderResponse = {
+  order: {
+    id: string;
+    totalRand: number;
+  };
+};
+
+type OrderOffer = {
+  id: string | null;
+  title: string;
+  priceRand: number;
+};
+
+function PublicSite() {
   const [orderInfoOpen, setOrderInfoOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [selectedFlavour, setSelectedFlavour] = useState(flavours[0]);
-  const whatsappNumber = import.meta.env.VITE_WHATSAPP_NUMBER?.replace(/\D/g, '');
+  const [orderSubmitting, setOrderSubmitting] = useState(false);
+  const [orderError, setOrderError] = useState('');
+  const [submittedOrder, setSubmittedOrder] = useState<OrderResponse['order'] | null>(null);
+  const [orderOffer, setOrderOffer] = useState<OrderOffer>({
+    id: null,
+    title: 'Saturday Spread',
+    priceRand: 200,
+  });
+  const [orderForm, setOrderForm] = useState({
+    customerName: '',
+    phone: '',
+    quantity: '1',
+    notes: '',
+  });
+  const [deals, setDeals] = useState<Deal[]>([]);
+  const [dealsError, setDealsError] = useState('');
+  const [dealsLoading, setDealsLoading] = useState(true);
 
   useEffect(() => {
     if (!orderInfoOpen) return;
@@ -18,20 +60,60 @@ function App() {
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [orderInfoOpen]);
 
-  const handleOrder = () => {
+  useEffect(() => {
+    let active = true;
+    apiRequest<{ deals: Deal[] }>('/api/deals')
+      .then((result) => {
+        if (active) setDeals(result.deals);
+      })
+      .catch((error: unknown) => {
+        if (active) {
+          setDealsError(error instanceof Error ? error.message : 'Specials could not be loaded.');
+        }
+      })
+      .finally(() => {
+        if (active) setDealsLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const handleOrder = (deal?: Deal) => {
     setMenuOpen(false);
-
-    if (!whatsappNumber) {
-      setOrderInfoOpen(true);
-      return;
-    }
-
-    const message = `Hi Grill Craft, I'd like to order the Saturday Spread (R200). Flavour: ${selectedFlavour}.`;
-    window.open(
-      `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(message)}`,
-      '_blank',
-      'noopener,noreferrer',
+    setSubmittedOrder(null);
+    setOrderError('');
+    setOrderOffer(
+      deal
+        ? { id: deal.id, title: deal.title, priceRand: deal.priceRand }
+        : { id: null, title: 'Saturday Spread', priceRand: 200 },
     );
+    setOrderInfoOpen(true);
+  };
+
+  const submitOrder = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setOrderSubmitting(true);
+    setOrderError('');
+
+    try {
+      const result = await apiRequest<OrderResponse>('/api/orders', {
+        method: 'POST',
+        body: JSON.stringify({
+          customerName: orderForm.customerName,
+          phone: orderForm.phone,
+          flavour: selectedFlavour,
+          quantity: Number(orderForm.quantity),
+          notes: orderForm.notes,
+          dealId: orderOffer.id,
+        }),
+      });
+      setSubmittedOrder(result.order);
+    } catch (error) {
+      setOrderError(error instanceof Error ? error.message : 'Your order could not be placed. Please try again.');
+    } finally {
+      setOrderSubmitting(false);
+    }
   };
 
   return (
@@ -46,7 +128,7 @@ function App() {
         </a>
         <nav className={`header-nav${menuOpen ? ' is-open' : ''}`} aria-label="Main navigation">
           <a href="#spread" onClick={() => setMenuOpen(false)}>The Saturday Spread</a>
-          <button className="header-order" onClick={handleOrder} data-testid="button-order-header">
+          <button className="header-order" onClick={() => handleOrder()} data-testid="button-order-header">
             Order now <ArrowUpRight size={16} aria-hidden="true" />
           </button>
         </nav>
@@ -104,7 +186,7 @@ function App() {
                 ))}
               </ul>
               <p className="order-deadline">ORDER BY FRIDAY</p>
-              <button className="poster-order" onClick={handleOrder} data-testid="button-order-saturday">
+              <button className="poster-order" onClick={() => handleOrder()} data-testid="button-order-saturday">
                 <MessageCircle size={21} aria-hidden="true" />
                 <span>Order Saturday’s</span>
                 <ArrowUpRight size={19} aria-hidden="true" />
@@ -117,6 +199,50 @@ function App() {
         <div className="hero-rule" aria-hidden="true"><span /></div>
       </section>
 
+      <section className="deals-section" aria-labelledby="deals-title">
+        <div className="deals-heading">
+          <div>
+            <p className="eyebrow">From the grill, for a limited time</p>
+            <h2 id="deals-title">This week’s <em>deals.</em></h2>
+          </div>
+          <span className="deals-count">{deals.length.toString().padStart(2, '0')} / LIVE</span>
+        </div>
+        {dealsLoading && <p className="deals-message" role="status">Checking this week’s specials…</p>}
+        {!dealsLoading && dealsError && (
+          <p className="deals-message deals-error" role="status">{dealsError}</p>
+        )}
+        {!dealsLoading && !dealsError && deals.length === 0 && (
+          <p className="deals-message">No extra deals this week. The Saturday Spread is ready below.</p>
+        )}
+        {!dealsLoading && !dealsError && deals.length > 0 && (
+          <div className="deals-grid">
+            {deals.map((deal) => (
+              <article className="deal-card" key={deal.id} data-testid={`card-deal-${deal.id}`}>
+                {deal.imageUrl ? (
+                  <img className="deal-image" src={deal.imageUrl} alt="" loading="lazy" />
+                ) : (
+                  <div className="deal-image deal-image-placeholder" aria-hidden="true"><Flame /></div>
+                )}
+                <div className="deal-copy">
+                  <p className="deal-label">GRILL CRAFT SPECIAL</p>
+                  <h3>{deal.title}</h3>
+                  <p className="deal-description">{deal.description}</p>
+                  <p className="deal-price">
+                    <strong>R{deal.priceRand.toFixed(0)}</strong>
+                    {deal.originalPriceRand !== null && (
+                      <del>R{deal.originalPriceRand.toFixed(0)}</del>
+                    )}
+                  </p>
+                  <button className="deal-order" onClick={() => handleOrder(deal)} data-testid={`button-order-deal-${deal.id}`}>
+                    Order this deal <ArrowUpRight size={16} aria-hidden="true" />
+                  </button>
+                </div>
+              </article>
+            ))}
+          </div>
+        )}
+      </section>
+
       <section className="closing-note" aria-labelledby="closing-title">
         <div className="closing-number">SAT<br />02</div>
         <div className="closing-copy">
@@ -125,7 +251,7 @@ function App() {
         </div>
         <div className="closing-action">
           <p>Saturday Spread · R200</p>
-          <button className="text-order" onClick={handleOrder} data-testid="button-order-footer">
+          <button className="text-order" onClick={() => handleOrder()} data-testid="button-order-footer">
             Order by Friday <ArrowUpRight size={17} aria-hidden="true" />
           </button>
         </div>
@@ -134,7 +260,10 @@ function App() {
       <footer className="site-footer">
         <a className="footer-brand" href="#top" data-testid="link-footer-home">GRILL CRAFT <span>(PTY) LTD.</span></a>
         <p>Flame-grilled chicken, made for sharing.</p>
-        <span className="footer-mark" aria-hidden="true">GC—02</span>
+        <div className="footer-utility">
+          <a className="footer-admin" href="/admin" data-testid="link-admin">Admin</a>
+          <span className="footer-mark" aria-hidden="true">GC—02</span>
+        </div>
       </footer>
 
       {orderInfoOpen && (
@@ -145,18 +274,113 @@ function App() {
             <button className="dialog-close" aria-label="Close order information" onClick={() => setOrderInfoOpen(false)} data-testid="button-close-order-info">
               <X size={19} />
             </button>
-            <span className="dialog-icon"><MessageCircle size={23} /></span>
-            <p className="eyebrow">A quick note before you order</p>
-            <h2 id="dialog-title">We’re nearly<br /><em>ready to take orders.</em></h2>
-            <p className="dialog-copy">This page needs Grill Craft’s WhatsApp number before it can open an order message. No order has been sent.</p>
-            <button className="dialog-done" onClick={() => setOrderInfoOpen(false)} data-testid="button-understood">
-              Got it <ArrowUpRight size={16} />
-            </button>
-            <p className="dialog-footnote">Saturday Spread · R200 · {selectedFlavour} · Order by Friday</p>
+            {submittedOrder ? (
+              <div className="order-success" role="status">
+                <span className="dialog-icon"><Check size={23} /></span>
+                <p className="eyebrow">Order received</p>
+                <h2 id="dialog-title">You’re on<br /><em>the list.</em></h2>
+                <p className="dialog-copy">
+                  Order {submittedOrder.id.slice(0, 8).toUpperCase()} is saved. Grill Craft will contact you to confirm the details.
+                </p>
+                <p className="dialog-footnote">Estimated total · R{submittedOrder.totalRand.toFixed(0)}</p>
+                <button className="dialog-done" onClick={() => setOrderInfoOpen(false)} data-testid="button-close-order-success">
+                  Done <ArrowUpRight size={16} />
+                </button>
+              </div>
+            ) : (
+              <>
+                <span className="dialog-icon"><MessageCircle size={23} /></span>
+                <p className="eyebrow">{orderOffer.id ? 'ORDER THIS SPECIAL' : 'ORDER THE SATURDAY SPREAD'}</p>
+                <h2 id="dialog-title">Let’s get<br /><em>your order in.</em></h2>
+                <p className="dialog-copy">
+                  {orderOffer.id ? orderOffer.title : 'Two half chickens, sides and four rotis'} · R{orderOffer.priceRand.toFixed(0)} each.
+                </p>
+                <form className="order-form" onSubmit={submitOrder}>
+                  <label>
+                    Your name
+                    <input
+                      required
+                      maxLength={100}
+                      autoComplete="name"
+                      value={orderForm.customerName}
+                      onChange={(event) => setOrderForm({ ...orderForm, customerName: event.target.value })}
+                      data-testid="input-order-name"
+                    />
+                  </label>
+                  <label>
+                    Mobile number
+                    <input
+                      required
+                      type="tel"
+                      inputMode="tel"
+                      autoComplete="tel"
+                      maxLength={32}
+                      value={orderForm.phone}
+                      onChange={(event) => setOrderForm({ ...orderForm, phone: event.target.value })}
+                      data-testid="input-order-phone"
+                    />
+                  </label>
+                  <div className="order-form-row">
+                    <label>
+                      Quantity
+                      <input
+                        required
+                        type="number"
+                        min="1"
+                        max="20"
+                        step="1"
+                        value={orderForm.quantity}
+                        onChange={(event) => setOrderForm({ ...orderForm, quantity: event.target.value })}
+                        data-testid="input-order-quantity"
+                      />
+                    </label>
+                    <label>
+                      Flavour
+                      <select
+                        value={selectedFlavour}
+                        onChange={(event) => setSelectedFlavour(event.target.value)}
+                        data-testid="select-order-flavour"
+                      >
+                        {flavours.map((flavour) => <option key={flavour}>{flavour}</option>)}
+                      </select>
+                    </label>
+                  </div>
+                  <label>
+                    Notes <span className="optional-label">Optional</span>
+                    <textarea
+                      maxLength={1000}
+                      rows={2}
+                      value={orderForm.notes}
+                      onChange={(event) => setOrderForm({ ...orderForm, notes: event.target.value })}
+                      data-testid="input-order-notes"
+                    />
+                  </label>
+                  {orderError && <p className="form-error" role="alert">{orderError}</p>}
+                  <button className="dialog-done order-submit" type="submit" disabled={orderSubmitting} data-testid="button-submit-order">
+                    {orderSubmitting ? <LoaderCircle size={17} className="spin" /> : <MessageCircle size={17} />}
+                    {orderSubmitting ? 'Sending order…' : `Place order · R${(Math.max(1, Number(orderForm.quantity) || 1) * orderOffer.priceRand).toFixed(0)}`}
+                    {!orderSubmitting && <ArrowUpRight size={16} />}
+                  </button>
+                </form>
+                <p className="dialog-footnote">
+                  {orderOffer.id ? 'We’ll contact you to confirm your order' : 'Order by Friday · We’ll contact you to confirm'}
+                </p>
+              </>
+            )}
           </section>
         </div>
       )}
     </main>
+  );
+}
+
+function App() {
+  return (
+    <Switch>
+      <Route path="/" component={PublicSite} />
+      <Route path="/admin" component={AdminPage} />
+      <Route component={NotFound} />
+    </Switch>
   );
 }
 
