@@ -1,6 +1,6 @@
-import { clearSessionCookie, requireSameOrigin } from "../lib/auth";
-import { methodNotAllowed, ok } from "../lib/http";
-import type { ApiRequest, ApiResponse } from "../lib/http";
+import { clearSessionCookie, requireSameOrigin } from "../lib/_auth";
+import { methodNotAllowed, ok } from "../lib/_http";
+import type { ApiRequest, ApiResponse } from "../lib/_http";
 
 export default function handler(req: ApiRequest, res: ApiResponse) {
   if (req.method !== "POST") return methodNotAllowed(res, ["POST"]);

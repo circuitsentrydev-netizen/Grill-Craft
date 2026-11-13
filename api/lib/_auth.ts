@@ -1,6 +1,6 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
-import type { ApiRequest, ApiResponse } from "./http";
-import { fail } from "./http";
+import type { ApiRequest, ApiResponse } from "./_http";
+import { fail } from "./_http";
 
 const COOKIE_NAME = "gc_admin_session";
 const SESSION_SECONDS = 60 * 60 * 8;

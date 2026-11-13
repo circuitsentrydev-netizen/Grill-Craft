@@ -2,14 +2,14 @@ import {
   requireSameOrigin,
   sessionCookie,
   verifyAdminCredentials,
-} from "../lib/auth";
+} from "../lib/_auth";
 import {
   fail,
   methodNotAllowed,
   ok,
   requestBody,
-} from "../lib/http";
-import type { ApiRequest, ApiResponse } from "../lib/http";
+} from "../lib/_http";
+import type { ApiRequest, ApiResponse } from "../lib/_http";
 
 export default function handler(req: ApiRequest, res: ApiResponse) {
   if (req.method !== "POST") return methodNotAllowed(res, ["POST"]);

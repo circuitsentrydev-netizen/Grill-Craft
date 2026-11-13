@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
-import { adminAuthConfigured, authenticateAdmin } from "../lib/auth";
-import { database, toOrder, type OrderRow } from "../lib/database";
+import { adminAuthConfigured, authenticateAdmin } from "../lib/_auth";
+import { database, toOrder, type OrderRow } from "../lib/_database";
 import {
   fail,
   methodNotAllowed,
@@ -9,8 +9,8 @@ import {
   publicError,
   requestBody,
   requiredText,
-} from "../lib/http";
-import type { ApiRequest, ApiResponse } from "../lib/http";
+} from "../lib/_http";
+import type { ApiRequest, ApiResponse } from "../lib/_http";
 
 const flavours = new Set([
   "Peri Peri",

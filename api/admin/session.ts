@@ -1,6 +1,6 @@
-import { adminAuthConfigured, authenticateAdmin } from "../lib/auth";
-import { fail, methodNotAllowed, ok } from "../lib/http";
-import type { ApiRequest, ApiResponse } from "../lib/http";
+import { adminAuthConfigured, authenticateAdmin } from "../lib/_auth";
+import { fail, methodNotAllowed, ok } from "../lib/_http";
+import type { ApiRequest, ApiResponse } from "../lib/_http";
 
 export default function handler(req: ApiRequest, res: ApiResponse) {
   if (req.method !== "GET") return methodNotAllowed(res, ["GET"]);

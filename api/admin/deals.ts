@@ -1,12 +1,12 @@
-import { adminAuthConfigured, authenticateAdmin } from "../lib/auth";
-import { database, toDeal, type DealRow } from "../lib/database";
+import { adminAuthConfigured, authenticateAdmin } from "../lib/_auth";
+import { database, toDeal, type DealRow } from "../lib/_database";
 import {
   fail,
   methodNotAllowed,
   ok,
   publicError,
-} from "../lib/http";
-import type { ApiRequest, ApiResponse } from "../lib/http";
+} from "../lib/_http";
+import type { ApiRequest, ApiResponse } from "../lib/_http";
 
 export default async function handler(req: ApiRequest, res: ApiResponse) {
   if (req.method !== "GET") return methodNotAllowed(res, ["GET"]);

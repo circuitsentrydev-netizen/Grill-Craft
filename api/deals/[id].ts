@@ -2,16 +2,16 @@ import {
   adminAuthConfigured,
   authenticateAdmin,
   requireSameOrigin,
-} from "../lib/auth";
-import { database, toDeal, type DealRow } from "../lib/database";
+} from "../lib/_auth";
+import { database, toDeal, type DealRow } from "../lib/_database";
 import {
   fail,
   methodNotAllowed,
   ok,
   publicError,
   requestBody,
-} from "../lib/http";
-import type { ApiRequest, ApiResponse } from "../lib/http";
+} from "../lib/_http";
+import type { ApiRequest, ApiResponse } from "../lib/_http";
 
 export default async function handler(req: ApiRequest, res: ApiResponse) {
   if (req.method !== "PATCH") return methodNotAllowed(res, ["PATCH"]);

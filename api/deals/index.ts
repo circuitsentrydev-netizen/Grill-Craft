@@ -3,8 +3,8 @@ import {
   adminAuthConfigured,
   authenticateAdmin,
   requireSameOrigin,
-} from "../lib/auth";
-import { database, toDeal, type DealRow } from "../lib/database";
+} from "../lib/_auth";
+import { database, toDeal, type DealRow } from "../lib/_database";
 import {
   fail,
   isoDate,
@@ -14,8 +14,8 @@ import {
   publicError,
   requestBody,
   requiredText,
-} from "../lib/http";
-import type { ApiRequest, ApiResponse } from "../lib/http";
+} from "../lib/_http";
+import type { ApiRequest, ApiResponse } from "../lib/_http";
 
 function validImageUrl(value: string | null | undefined) {
   if (value === null || value === undefined) return value;
