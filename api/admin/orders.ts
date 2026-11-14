@@ -23,7 +23,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
   const unitPrice = Number(body?.unitPriceRand);
   const paymentMethod = requiredText(body?.paymentMethod, 20);
 
-  if (!customerName || !phone || !/^\\+?[0-9()\\s.-]{7,32}$/.test(phone) ||
+  if (!customerName || !phone || !/^\+?[0-9()\s.-]{7,32}$/.test(phone) ||
       !itemName || !flavour || !flavours.has(flavour) ||
       !Number.isInteger(quantity) || quantity < 1 || quantity > 20 ||
       !Number.isFinite(unitPrice) || unitPrice <= 0 || unitPrice > 100000 ||
