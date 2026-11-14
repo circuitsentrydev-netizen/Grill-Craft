@@ -116,6 +116,7 @@ function PublicSite() {
           notes: orderForm.notes,
           dealId: orderOffer.id,
           sauceOption: orderForm.sauceOption,
+          itemType: orderOffer.title === 'Whole Chicken' ? 'whole_chicken' : 'saturday_spread',
         }),
       });
       setSubmittedOrder(result.order);
