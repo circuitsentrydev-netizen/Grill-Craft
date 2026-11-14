@@ -49,6 +49,10 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
   const dealId = optionalText(body?.dealId, 100);
   const sauceOption = body?.sauceOption === "smothered" ? "smothered" : "none";
   const itemType = body?.itemType === "whole_chicken" ? "whole_chicken" : "saturday_spread";
+  const paymentMethod = body?.paymentMethod === "cash" || body?.paymentMethod === "eft" || body?.paymentMethod === "yoco" ? body.paymentMethod : "whatsapp";
+  const paymentStatus = paymentMethod === "cash" ? "cash_on_collection" : "pending";
+  const paymentProvider = paymentMethod === "yoco" ? "yoco" : "manual";
+  const paymentReference = paymentMethod === "yoco" ? null : paymentMethod;
   const quantity = Number(body?.quantity);
 
   if (
@@ -77,11 +81,13 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
       ? ((await sql`
           INSERT INTO orders (
             id, customer_name, phone, item_name, unit_price_rand, deal_id,
-            flavour, quantity, total_rand, notes, status, sauce_option
+            flavour, quantity, total_rand, notes, status, sauce_option,
+            payment_status, payment_provider, payment_reference
           )
           SELECT ${id}, ${customerName}, ${phone}, deals.title,
             deals.price_rand, deals.id, ${flavour}, ${quantity},
-            deals.price_rand * ${quantity}, ${notes}, 'new', ${sauceOption}
+            deals.price_rand * ${quantity}, ${notes}, 'new', ${sauceOption},
+            ${paymentStatus}, ${paymentProvider}, ${paymentReference}
           FROM deals
           WHERE deals.id = ${dealId}
             AND deals.active = TRUE
@@ -94,11 +100,13 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
         ? ((await sql`
             INSERT INTO orders (
               id, customer_name, phone, item_name, unit_price_rand, deal_id,
-              flavour, quantity, total_rand, notes, status, sauce_option
+              flavour, quantity, total_rand, notes, status, sauce_option,
+              payment_status, payment_provider, payment_reference
             )
             VALUES (
               ${id}, ${customerName}, ${phone}, 'Whole Chicken', 170, NULL,
-              ${flavour}, ${quantity}, ${quantity * 170}, ${notes}, 'new', ${sauceOption}
+              ${flavour}, ${quantity}, ${quantity * 170}, ${notes}, 'new', ${sauceOption},
+              ${paymentStatus}, ${paymentProvider}, ${paymentReference}
             )
             RETURNING id, customer_name, phone, item_name, unit_price_rand,
               deal_id, flavour, quantity, total_rand, notes, status, created_at
@@ -110,14 +118,15 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
             )
             VALUES (
               ${id}, ${customerName}, ${phone}, 'Saturday Spread', 220, NULL,
-              ${flavour}, ${quantity}, ${quantity * 220}, ${notes}, 'new', ${sauceOption}
+              ${flavour}, ${quantity}, ${quantity * 220}, ${notes}, 'new', ${sauceOption},
+              ${paymentStatus}, ${paymentProvider}, ${paymentReference}
             )
             RETURNING id, customer_name, phone, item_name, unit_price_rand,
               deal_id, flavour, quantity, total_rand, notes, status, created_at
           `) as OrderRow[]);
     if (!rows[0]) return fail(res, 409, "That deal is no longer available.");
     await sql`INSERT INTO order_events (order_id, event_type, message) VALUES (${id}, 'created', 'Order received by Grill Craft')`;
-    return ok(res, { order: { ...toOrder(rows[0]), sauceOption, paymentStatus: "pending" } }, 201);
+    return ok(res, { order: { ...toOrder(rows[0]), sauceOption, paymentStatus } }, 201);
   } catch (error) {
     return publicError(res, error);
   }
