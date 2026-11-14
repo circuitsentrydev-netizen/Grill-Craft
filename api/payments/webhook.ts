@@ -43,7 +43,7 @@ type YocoPaymentEvent = {
     currency?: string;
     status?: string;
     mode?: string;
-    metadata?: { orderId?: string };
+    metadata?: { checkoutId?: string };
   };
 };
 
@@ -63,7 +63,7 @@ export default async function handler(req: IncomingMessage, res: ApiResponse) {
 
     const event = JSON.parse(raw.toString("utf8")) as YocoPaymentEvent;
     const eventId = header(req, "webhook-id");
-    const orderId = event.payload?.metadata?.orderId;
+    const checkoutId = event.payload?.metadata?.checkoutId;
 
     if (!eventId || !event.type || !event.payload) {
       return res.status(400).json({ error: "Invalid webhook event." });
@@ -71,20 +71,20 @@ export default async function handler(req: IncomingMessage, res: ApiResponse) {
     if (event.type !== "payment.succeeded" && event.type !== "payment.failed") {
       return res.status(200).json({ received: true, ignored: true });
     }
-    if (!orderId) {
-      return res.status(400).json({ error: "Order reference is missing from the payment event." });
+    if (!checkoutId) {
+      return res.status(400).json({ error: "Checkout reference is missing." });
     }
 
     const sql = database();
     const rows = (await sql`
       SELECT id, total_rand, yoco_checkout_id
       FROM orders
-      WHERE id = ${orderId}
+      WHERE yoco_checkout_id = ${checkoutId}
       LIMIT 1
     `) as { id: string; total_rand: number | string; yoco_checkout_id: string | null }[];
     const order = rows[0];
 
-    if (!order || !order.yoco_checkout_id) {
+    if (!order || order.yoco_checkout_id !== checkoutId) {
       return res.status(200).json({ received: true, ignored: true });
     }
 
@@ -115,7 +115,7 @@ export default async function handler(req: IncomingMessage, res: ApiResponse) {
         await sql`
           UPDATE orders
           SET payment_status = 'paid',
-              payment_reference = ${event.payload.id || order.yoco_checkout_id},
+              payment_reference = ${event.payload.id || checkoutId},
               updated_at = NOW()
           WHERE id = ${order.id}
         `;
