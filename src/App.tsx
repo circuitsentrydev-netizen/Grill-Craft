@@ -227,6 +227,38 @@ function PublicSite() {
         <div className="hero-rule" aria-hidden="true"><span /></div>
       </section>
 
+      <section className="deals-section menu-selection" id="menu" aria-labelledby="menu-title">
+        <div className="deals-heading">
+          <div>
+            <p className="eyebrow">Choose from the Grill Craft menu</p>
+            <h2 id="menu-title">Pick your <em>plate.</em></h2>
+          </div>
+          <span className="deals-count">01 / MENU</span>
+        </div>
+        <div className="deals-grid">
+          <article className="deal-card menu-product-card">
+            <div className="deal-image deal-image-placeholder menu-product-art" aria-hidden="true"><Flame /></div>
+            <div className="deal-copy">
+              <p className="deal-label">SATURDAY SPECIAL · ORDER BY FRIDAY</p>
+              <h3>Two halves. Full-on feast.</h3>
+              <p className="deal-description">Two half chickens, homemade coleslaw, medium chips and four rotis. Choose Peri-Peri or Moroccan.</p>
+              <p className="deal-price"><strong>R220</strong></p>
+              <button className="deal-order" onClick={() => handleOrder()} data-testid="card-order-saturday">Select this meal <ArrowUpRight size={16} aria-hidden="true" /></button>
+            </div>
+          </article>
+          <article className="deal-card menu-product-card">
+            <div className="deal-image deal-image-placeholder menu-product-art chicken-art" aria-hidden="true"><Flame /></div>
+            <div className="deal-copy">
+              <p className="deal-label">FROM THE GRILL</p>
+              <h3>Whole chicken</h3>
+              <p className="deal-description">A flame-grilled favourite. Select your flavour and quantity when placing the order.</p>
+              <p className="deal-price"><strong>R170</strong></p>
+              <button className="deal-order" onClick={handleWholeChicken} data-testid="card-order-whole-chicken">Select this meal <ArrowUpRight size={16} aria-hidden="true" /></button>
+            </div>
+          </article>
+        </div>
+      </section>
+
       <section className="deals-section" aria-labelledby="deals-title">
         <div className="deals-heading">
           <div>
