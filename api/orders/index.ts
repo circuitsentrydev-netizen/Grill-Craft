@@ -114,7 +114,8 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
         : ((await sql`
             INSERT INTO orders (
               id, customer_name, phone, item_name, unit_price_rand, deal_id,
-              flavour, quantity, total_rand, notes, status, sauce_option
+              flavour, quantity, total_rand, notes, status, sauce_option,
+              payment_status, payment_provider, payment_reference
             )
             VALUES (
               ${id}, ${customerName}, ${phone}, 'Saturday Spread', 220, NULL,
