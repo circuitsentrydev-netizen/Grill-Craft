@@ -101,7 +101,7 @@ async function apiRequest<T>(path: string, init?: RequestInit): Promise<T> {
 
   if (!response.headers.get('content-type')?.includes('application/json')) {
     throw new ApiError(
-      'The Vercel admin API is not available in this preview. Configure and deploy the Vercel project to use admin tools.',
+      'Admin tools run on the live Vercel site, not inside this Replit preview. Open https://grillscraftwenties.vercel.app/admin to manage orders.',
       response.status || 503,
     );
   }
