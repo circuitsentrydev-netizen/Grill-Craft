@@ -27,7 +27,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
       !itemName || !flavour || !flavours.has(flavour) ||
       !Number.isInteger(quantity) || quantity < 1 || quantity > 20 ||
       !Number.isFinite(unitPrice) || unitPrice <= 0 || unitPrice > 100000 ||
-      notes === undefined || !paymentMethods.has(paymentMethod)) {
+      notes === undefined || !paymentMethod || !paymentMethods.has(paymentMethod)) {
     return fail(res, 400, "Check the order details and try again.");
   }
 
