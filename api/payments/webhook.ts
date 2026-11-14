@@ -34,6 +34,19 @@ function verifySignature(raw: Buffer, req: IncomingMessage, secret: string) {
   });
 }
 
+type YocoPaymentEvent = {
+  id?: string;
+  type?: string;
+  payload?: {
+    id?: string;
+    amount?: number;
+    currency?: string;
+    status?: string;
+    mode?: string;
+    metadata?: { checkoutId?: string };
+  };
+};
+
 export default async function handler(req: IncomingMessage, res: ApiResponse) {
   if (req.method !== "POST") {
     res.setHeader("Allow", "POST");
@@ -41,50 +54,88 @@ export default async function handler(req: IncomingMessage, res: ApiResponse) {
   }
   const secret = process.env.YOCO_WEBHOOK_SECRET;
   if (!secret) return res.status(503).json({ error: "Yoco webhook is not configured." });
+
   try {
     const raw = await readRawBody(req);
-    if (!verifySignature(raw, req, secret)) return res.status(401).json({ error: "Invalid webhook signature." });
-    const event = JSON.parse(raw.toString("utf8")) as {
-      id?: string; type?: string; payload?: {
-        id?: string; checkoutId?: string; amount?: number; currency?: string;
-        metadata?: { orderId?: string }; clientReferenceId?: string;
-      };
-    };
-    const eventId = header(req, "webhook-id");
-    if (!eventId || !event.type || !event.payload) return res.status(400).json({ error: "Invalid webhook event." });
-    const orderId = event.payload.metadata?.orderId || event.payload.clientReferenceId;
-    if (!orderId) return res.status(200).json({ received: true, ignored: true });
-    const sql = database();
-    const existing = (await sql`SELECT id, total_rand, yoco_checkout_id FROM orders WHERE id = ${orderId} LIMIT 1`) as { id: string; total_rand: number | string; yoco_checkout_id: string | null }[];
-    const order = existing[0] as { id: string; total_rand: number | string; yoco_checkout_id: string | null } | undefined;
-    if (!order) return res.status(200).json({ received: true, ignored: true });
-    const checkoutId = event.payload.checkoutId || event.payload.id;
-    if (!checkoutId || !order.yoco_checkout_id || checkoutId !== order.yoco_checkout_id) {
-      return res.status(400).json({ error: "Checkout reference mismatch." });
+    if (!verifySignature(raw, req, secret)) {
+      return res.status(401).json({ error: "Invalid webhook signature." });
     }
+
+    const event = JSON.parse(raw.toString("utf8")) as YocoPaymentEvent;
+    const eventId = header(req, "webhook-id");
+    const checkoutId = event.payload?.metadata?.checkoutId;
+
+    if (!eventId || !event.type || !event.payload) {
+      return res.status(400).json({ error: "Invalid webhook event." });
+    }
+    if (event.type !== "payment.succeeded" && event.type !== "payment.failed") {
+      return res.status(200).json({ received: true, ignored: true });
+    }
+    if (!checkoutId) {
+      return res.status(400).json({ error: "Checkout reference is missing." });
+    }
+
+    const sql = database();
+    const rows = (await sql`
+      SELECT id, total_rand, yoco_checkout_id
+      FROM orders
+      WHERE yoco_checkout_id = ${checkoutId}
+      LIMIT 1
+    `) as { id: string; total_rand: number | string; yoco_checkout_id: string | null }[];
+    const order = rows[0];
+
+    if (!order || order.yoco_checkout_id !== checkoutId) {
+      return res.status(200).json({ received: true, ignored: true });
+    }
+
     if (event.type === "payment.succeeded") {
-      if (event.payload.currency !== "ZAR") return res.status(400).json({ error: "Currency mismatch." });
-      if (typeof event.payload.amount !== "number" || event.payload.amount !== Math.round(Number(order.total_rand) * 100)) {
+      if (event.payload.currency !== "ZAR") {
+        return res.status(400).json({ error: "Currency mismatch." });
+      }
+      if (
+        typeof event.payload.amount !== "number" ||
+        event.payload.amount !== Math.round(Number(order.total_rand) * 100)
+      ) {
         return res.status(400).json({ error: "Payment amount mismatch." });
       }
-      const inserted = (await sql`
-        INSERT INTO payment_webhook_events (webhook_id, event_type)
-        VALUES (${eventId}, ${event.type}) ON CONFLICT (webhook_id) DO NOTHING RETURNING webhook_id
-      `) as { webhook_id: string }[];
-      if (inserted.length) {
-        await sql`UPDATE orders SET payment_status = 'paid', payment_reference = ${checkoutId ?? eventId}, updated_at = NOW() WHERE id = ${orderId}`;
-        await sql`INSERT INTO order_events (order_id, event_type, message) VALUES (${orderId}, 'payment_paid', 'Yoco payment confirmed')`;
-      }
-    } else if (event.type === "payment.failed") {
-      const inserted = (await sql`
-        INSERT INTO payment_webhook_events (webhook_id, event_type)
-        VALUES (${eventId}, ${event.type}) ON CONFLICT (webhook_id) DO NOTHING RETURNING webhook_id
-      `) as { webhook_id: string }[];
-      if (inserted.length) {
-        await sql`UPDATE orders SET payment_status = 'failed', updated_at = NOW() WHERE id = ${orderId}`;
-        await sql`INSERT INTO order_events (order_id, event_type, message) VALUES (${orderId}, 'payment_failed', 'Yoco payment was not completed')`;
+      if (event.payload.status && event.payload.status !== "succeeded") {
+        return res.status(400).json({ error: "Payment status mismatch." });
       }
     }
+
+    const inserted = (await sql`
+      INSERT INTO payment_webhook_events (webhook_id, event_type)
+      VALUES (${eventId}, ${event.type})
+      ON CONFLICT (webhook_id) DO NOTHING
+      RETURNING webhook_id
+    `) as { webhook_id: string }[];
+
+    if (inserted.length) {
+      if (event.type === "payment.succeeded") {
+        await sql`
+          UPDATE orders
+          SET payment_status = 'paid',
+              payment_reference = ${event.payload.id || checkoutId},
+              updated_at = NOW()
+          WHERE id = ${order.id}
+        `;
+        await sql`
+          INSERT INTO order_events (order_id, event_type, message)
+          VALUES (${order.id}, 'payment_paid', 'Yoco payment confirmed')
+        `;
+      } else {
+        await sql`
+          UPDATE orders
+          SET payment_status = 'failed', updated_at = NOW()
+          WHERE id = ${order.id} AND payment_status <> 'paid'
+        `;
+        await sql`
+          INSERT INTO order_events (order_id, event_type, message)
+          VALUES (${order.id}, 'payment_failed', 'Yoco payment was not completed')
+        `;
+      }
+    }
+
     return res.status(200).json({ received: true });
   } catch (error) {
     console.error("Yoco webhook processing failed", error);
