@@ -116,6 +116,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
               deal_id, flavour, quantity, total_rand, notes, status, created_at
           `) as OrderRow[]);
     if (!rows[0]) return fail(res, 409, "That deal is no longer available.");
+    await sql`INSERT INTO order_events (order_id, event_type, message) VALUES (${id}, 'created', 'Order received by Grill Craft')`;
     return ok(res, { order: { ...toOrder(rows[0]), sauceOption, paymentStatus: "pending" } }, 201);
   } catch (error) {
     return publicError(res, error);
