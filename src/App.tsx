@@ -5,7 +5,7 @@ import AdminPage from '@/pages/admin';
 import NotFound from '@/pages/not-found';
 import { apiRequest } from '@/lib/api';
 
-const flavours = ['Peri Peri', 'Spicy Texan', 'Sweet Moroccan'];
+const flavours = ['Mozambican Peri-Peri', 'Moroccan'];
 
 type Deal = {
   id: string;
@@ -39,13 +39,14 @@ function PublicSite() {
   const [orderOffer, setOrderOffer] = useState<OrderOffer>({
     id: null,
     title: 'Saturday Spread',
-    priceRand: 200,
+    priceRand: 220,
   });
   const [orderForm, setOrderForm] = useState({
     customerName: '',
     phone: '',
     quantity: '1',
     notes: '',
+    sauceOption: 'none',
   });
   const [deals, setDeals] = useState<Deal[]>([]);
   const [dealsError, setDealsError] = useState('');
@@ -86,7 +87,7 @@ function PublicSite() {
     setOrderOffer(
       deal
         ? { id: deal.id, title: deal.title, priceRand: deal.priceRand }
-        : { id: null, title: 'Saturday Spread', priceRand: 200 },
+        : { id: null, title: 'Saturday Spread', priceRand: 220 },
     );
     setOrderInfoOpen(true);
   };
@@ -106,6 +107,7 @@ function PublicSite() {
           quantity: Number(orderForm.quantity),
           notes: orderForm.notes,
           dealId: orderOffer.id,
+          sauceOption: orderForm.sauceOption,
         }),
       });
       setSubmittedOrder(result.order);
@@ -128,6 +130,7 @@ function PublicSite() {
         </a>
         <nav className={`header-nav${menuOpen ? ' is-open' : ''}`} aria-label="Main navigation">
           <a href="#spread" onClick={() => setMenuOpen(false)}>The Saturday Spread</a>
+          <a href="/track" onClick={() => setMenuOpen(false)}>Track order</a>
           <button className="header-order" onClick={() => handleOrder()} data-testid="button-order-header">
             Order now <ArrowUpRight size={16} aria-hidden="true" />
           </button>
@@ -168,7 +171,7 @@ function PublicSite() {
               <h2 id="poster-title">TWO HALVES.<br /><span>FULL-ON FEAST.</span></h2>
               <p className="poster-description">Two half chickens, sides &amp; rotis: homemade coleslaw, medium chips and four rotis.</p>
               <div className="price-block">
-                <p className="price">R200</p>
+                <p className="price">R220</p>
                 <p className="price-caption">Choose your fire-kissed flavour</p>
               </div>
               <ul className="flavour-list" aria-label="Choose a flavour">
@@ -261,6 +264,7 @@ function PublicSite() {
         <a className="footer-brand" href="#top" data-testid="link-footer-home">GRILL CRAFT <span>(PTY) LTD.</span></a>
         <p>Flame-grilled chicken, made for sharing.</p>
         <div className="footer-utility">
+          <a className="footer-admin" href="/track">Track order</a>
           <a className="footer-admin" href="/admin" data-testid="link-admin">Admin</a>
           <span className="footer-mark" aria-hidden="true">GC—02</span>
         </div>
@@ -345,6 +349,13 @@ function PublicSite() {
                       </select>
                     </label>
                   </div>
+                  <label className="sauce-option">
+                    <span>Smothered-in-sauce dipping</span>
+                    <select value={orderForm.sauceOption} onChange={(event) => setOrderForm({ ...orderForm, sauceOption: event.target.value })}>
+                      <option value="none">No extra sauce</option>
+                      <option value="smothered">Add smothered sauce for dipping</option>
+                    </select>
+                  </label>
                   <label>
                     Notes <span className="optional-label">Optional</span>
                     <textarea
@@ -374,11 +385,90 @@ function PublicSite() {
   );
 }
 
+
+function TrackPage() {
+  const [orderId, setOrderId] = useState(new URLSearchParams(window.location.search).get('order') || '');
+  const [phone, setPhone] = useState('');
+  const [order, setOrder] = useState<{ id: string; itemName: string; flavour: string; quantity: number; totalRand: number; status: string; paymentStatus: string; sauceOption: string; createdAt: string } | null>(null);
+  const [events, setEvents] = useState<{ event_type: string; message: string; created_at: string }[]>([]);
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [notificationsEnabled, setNotificationsEnabled] = useState(false);
+
+  const loadOrder = async (silent = false) => {
+    if (!orderId.trim() || !phone.trim()) return;
+    if (!silent) setLoading(true);
+    try {
+      const result = await apiRequest<{ order: NonNullable<typeof order>; events: typeof events }>(
+        '/api/orders/track?id=' + encodeURIComponent(orderId.trim()) + '&phone=' + encodeURIComponent(phone.trim())
+      );
+      if (order && result.order.status !== order.status && notificationsEnabled && 'Notification' in window && Notification.permission === 'granted') {
+        new Notification('Grill Craft order update', { body: 'Your order is now ' + result.order.status + '.' });
+      }
+      setOrder(result.order);
+      setEvents(result.events);
+      setError('');
+    } catch (e) {
+      if (!silent) setError(e instanceof Error ? e.message : 'Order could not be found.');
+    } finally {
+      if (!silent) setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!order || !phone) return;
+    const timer = window.setInterval(() => void loadOrder(true), 12000);
+    return () => window.clearInterval(timer);
+  }, [order?.id, phone, notificationsEnabled]);
+
+  const enableNotifications = async () => {
+    if (!('Notification' in window)) {
+      setError('This browser does not support notifications.');
+      return;
+    }
+    const permission = await Notification.requestPermission();
+    setNotificationsEnabled(permission === 'granted');
+    if (permission !== 'granted') setError('Notifications were not enabled. Keep this page open to refresh your tracking manually.');
+  };
+
+  return (
+    <main className="site-shell tracking-shell">
+      <header className="site-header">
+        <a className="brand" href="/" aria-label="Grill Craft home"><span className="brand-mark"><Flame /></span><span className="brand-type"><strong>GRILL CRAFT</strong><small>(PTY) LTD.</small></span></a>
+        <nav className="header-nav"><a href="/">Home</a><a href="/#spread">Menu</a></nav>
+      </header>
+      <section className="tracking-page">
+        <p className="eyebrow">YOUR GRILL CRAFT ORDER</p>
+        <h1>Track your <em>order.</em></h1>
+        <p className="dialog-copy">Enter the order reference and the mobile number used at checkout.</p>
+        <form className="order-form tracking-form" onSubmit={(event) => { event.preventDefault(); void loadOrder(); }}>
+          <label>Order reference<input required value={orderId} onChange={(e) => setOrderId(e.target.value)} placeholder="Paste your order reference" /></label>
+          <label>Mobile number<input required type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="Your order mobile number" /></label>
+          {error && <p className="form-error" role="alert">{error}</p>}
+          <button className="dialog-done" type="submit" disabled={loading}>{loading ? 'Checking…' : 'Find my order'} <ArrowUpRight size={16} /></button>
+        </form>
+        {order && <section className="tracking-result" aria-live="polite">
+          <div className="tracking-result-head"><div><p className="eyebrow">ORDER {order.id.slice(0, 8).toUpperCase()}</p><h2>{order.status.replaceAll('_', ' ')}</h2></div><span className="tracking-status">{order.paymentStatus.replaceAll('_', ' ')}</span></div>
+          <p>{order.itemName} · {order.flavour} · Qty {order.quantity}</p>
+          <p>{order.sauceOption === 'smothered' ? 'Smothered sauce for dipping' : 'No extra dipping sauce'}</p>
+          <p className="tracking-total">Total · R{order.totalRand.toFixed(2)}</p>
+          <button className="text-order" type="button" onClick={enableNotifications}>Enable order notifications</button>
+          <p className="dialog-footnote">This page checks for updates every 12 seconds while it remains open. Browser notifications require your permission.</p>
+          <h3>Order updates</h3>
+          <ol className="tracking-events">{events.map((event, index) => <li key={event.event_type + event.created_at + index}><strong>{event.message}</strong><time>{new Date(event.created_at).toLocaleString('en-ZA')}</time></li>)}</ol>
+        </section>}
+      </section>
+      <footer className="site-footer"><a className="footer-brand" href="/">GRILL CRAFT <span>(PTY) LTD.</span></a><p>Flame-grilled chicken, made for sharing.</p><a href="/admin">Admin</a></footer>
+    </main>
+  );
+}
+
 function App() {
   return (
     <Switch>
       <Route path="/" component={PublicSite} />
       <Route path="/admin" component={AdminPage} />
+      <Route path="/track" component={TrackPage} />
       <Route component={NotFound} />
     </Switch>
   );
