@@ -92,6 +92,14 @@ function PublicSite() {
     setOrderInfoOpen(true);
   };
 
+  const startYocoPayment = async (orderId: string) => {
+    const checkout = await apiRequest<{ checkoutUrl: string }>('/api/payments/create', {
+      method: 'POST',
+      body: JSON.stringify({ orderId }),
+    });
+    window.location.assign(checkout.checkoutUrl);
+  };
+
   const submitOrder = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setOrderSubmitting(true);
@@ -111,6 +119,11 @@ function PublicSite() {
         }),
       });
       setSubmittedOrder(result.order);
+      try {
+        await startYocoPayment(result.order.id);
+      } catch (paymentError) {
+        setOrderError(paymentError instanceof Error ? paymentError.message : 'Your order was saved, but online payment could not start. Use Track order to check it.');
+      }
     } catch (error) {
       setOrderError(error instanceof Error ? error.message : 'Your order could not be placed. Please try again.');
     } finally {
@@ -287,6 +300,9 @@ function PublicSite() {
                   Order {submittedOrder.id.slice(0, 8).toUpperCase()} is saved. Grill Craft will contact you to confirm the details.
                 </p>
                 <p className="dialog-footnote">Estimated total · R{submittedOrder.totalRand.toFixed(0)}</p>
+                {orderError && <p className="form-error" role="alert">{orderError}</p>}
+                <button className="dialog-done" onClick={() => void startYocoPayment(submittedOrder.id)}>Pay securely with Yoco <ArrowUpRight size={16} /></button>
+                <a className="text-order" href={'/track?order=' + encodeURIComponent(submittedOrder.id)}>Track this order</a>
                 <button className="dialog-done" onClick={() => setOrderInfoOpen(false)} data-testid="button-close-order-success">
                   Done <ArrowUpRight size={16} />
                 </button>
