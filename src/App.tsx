@@ -290,8 +290,6 @@ function PublicSite() {
         <p>Flame-grilled chicken, made for sharing.</p>
         <div className="footer-utility">
           <a className="footer-admin" href="/track">Track order</a>
-          <a className="footer-admin" href="/privacy">Privacy</a>
-          <a className="footer-admin" href="/refunds">Returns & refunds</a>
           <a className="footer-admin" href="/admin" data-testid="link-admin">Admin</a>
           <span className="footer-mark" aria-hidden="true">GC—02</span>
         </div>
@@ -494,7 +492,7 @@ function TrackPage() {
           <ol className="tracking-events">{events.map((event, index) => <li key={event.event_type + event.created_at + index}><strong>{event.message}</strong><time>{new Date(event.created_at).toLocaleString('en-ZA')}</time></li>)}</ol>
         </section>}
       </section>
-      <footer className="site-footer"><a className="footer-brand" href="/">GRILL CRAFT <span>(PTY) LTD.</span></a><p>Flame-grilled chicken, made for sharing.</p><div className="footer-utility"><a href="/privacy">Privacy</a><a href="/refunds">Returns &amp; refunds</a><a href="/admin">Admin</a></div></footer>
+      <footer className="site-footer"><a className="footer-brand" href="/">GRILL CRAFT <span>(PTY) LTD.</span></a><p>Flame-grilled chicken, made for sharing.</p><div className="footer-utility"><a href="/admin">Admin</a></div></footer>
     </main>
   );
 }
