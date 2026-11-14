@@ -230,7 +230,7 @@ function AdminPage() {
     void refreshLists();
     const timer = window.setInterval(() => {
       void Promise.all([loadOrders(), loadDeals()]);
-    }, 45000);
+    }, 12000);
     return () => window.clearInterval(timer);
   }, [admin, loadDeals, loadOrders, refreshLists]);
 
