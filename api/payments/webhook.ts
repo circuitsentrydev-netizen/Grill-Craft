@@ -55,7 +55,7 @@ export default async function handler(req: IncomingMessage, res: ApiResponse) {
     const orderId = event.payload.metadata?.orderId || event.payload.clientReferenceId;
     if (!orderId) return res.status(200).json({ received: true, ignored: true });
     const sql = database();
-    const existing = await sql`SELECT id, total_rand, yoco_checkout_id FROM orders WHERE id = ${orderId} LIMIT 1`;
+    const existing = (await sql`SELECT id, total_rand, yoco_checkout_id FROM orders WHERE id = ${orderId} LIMIT 1`) as { id: string; total_rand: number | string; yoco_checkout_id: string | null }[];
     const order = existing[0] as { id: string; total_rand: number | string; yoco_checkout_id: string | null } | undefined;
     if (!order) return res.status(200).json({ received: true, ignored: true });
     const checkoutId = event.payload.checkoutId || event.payload.id;
@@ -67,10 +67,10 @@ export default async function handler(req: IncomingMessage, res: ApiResponse) {
       if (typeof event.payload.amount === "number" && event.payload.amount !== Math.round(Number(order.total_rand) * 100)) {
         return res.status(400).json({ error: "Payment amount mismatch." });
       }
-      const inserted = await sql`
+      const inserted = (await sql`
         INSERT INTO payment_webhook_events (webhook_id, event_type)
         VALUES (${eventId}, ${event.type}) ON CONFLICT (webhook_id) DO NOTHING RETURNING webhook_id
-      `;
+      `) as { webhook_id: string }[];
       if (inserted.length) {
         await sql`UPDATE orders SET payment_status = 'paid', payment_reference = ${checkoutId ?? eventId}, updated_at = NOW() WHERE id = ${orderId}`;
         await sql`INSERT INTO order_events (order_id, event_type, message) VALUES (${orderId}, 'payment_paid', 'Yoco payment confirmed')`;
