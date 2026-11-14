@@ -76,10 +76,10 @@ export default async function handler(req: IncomingMessage, res: ApiResponse) {
         await sql`INSERT INTO order_events (order_id, event_type, message) VALUES (${orderId}, 'payment_paid', 'Yoco payment confirmed')`;
       }
     } else if (event.type === "payment.failed") {
-      const inserted = await sql`
+      const inserted = (await sql`
         INSERT INTO payment_webhook_events (webhook_id, event_type)
         VALUES (${eventId}, ${event.type}) ON CONFLICT (webhook_id) DO NOTHING RETURNING webhook_id
-      `;
+      `) as { webhook_id: string }[];
       if (inserted.length) {
         await sql`UPDATE orders SET payment_status = 'failed', updated_at = NOW() WHERE id = ${orderId}`;
         await sql`INSERT INTO order_events (order_id, event_type, message) VALUES (${orderId}, 'payment_failed', 'Yoco payment was not completed')`;
