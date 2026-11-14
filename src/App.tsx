@@ -34,6 +34,7 @@ function PublicSite() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [selectedFlavour, setSelectedFlavour] = useState(flavours[0]);
   const [orderSubmitting, setOrderSubmitting] = useState(false);
+  const [paymentMethod, setPaymentMethod] = useState<'whatsapp' | 'cash' | 'eft' | 'yoco'>('whatsapp');
   const [orderError, setOrderError] = useState('');
   const [submittedOrder, setSubmittedOrder] = useState<OrderResponse['order'] | null>(null);
   const [orderOffer, setOrderOffer] = useState<OrderOffer>({
@@ -128,10 +129,12 @@ function PublicSite() {
         }),
       });
       setSubmittedOrder(result.order);
-      try {
-        await startYocoPayment(result.order.id);
-      } catch (paymentError) {
-        setOrderError(paymentError instanceof Error ? paymentError.message : 'Your order was saved, but online payment could not start. Use Track order to check it.');
+      if (paymentMethod === 'yoco') {
+        try {
+          await startYocoPayment(result.order.id);
+        } catch (paymentError) {
+          setOrderError(paymentError instanceof Error ? paymentError.message : 'Your order was saved, but Yoco checkout is not available yet. Please use WhatsApp, cash or EFT.');
+        }
       }
     } catch (error) {
       setOrderError(error instanceof Error ? error.message : 'Your order could not be placed. Please try again.');
@@ -313,7 +316,8 @@ function PublicSite() {
                 </p>
                 <p className="dialog-footnote">Estimated total · R{submittedOrder.totalRand.toFixed(0)}</p>
                 {orderError && <p className="form-error" role="alert">{orderError}</p>}
-                <button className="dialog-done" onClick={() => void startYocoPayment(submittedOrder.id)}>Pay securely with Yoco <ArrowUpRight size={16} /></button>
+                <p className="dialog-footnote">Payment choice: {paymentMethod === 'eft' ? 'EFT / pay-to-account — request verified account details on WhatsApp.' : paymentMethod === 'cash' ? 'Cash — pay when collecting or receiving your order.' : paymentMethod === 'yoco' ? 'Yoco online checkout.' : 'WhatsApp — confirm your order directly with Fred.'}</p>
+                <a className="dialog-done" target="_blank" rel="noreferrer" href={`https://wa.me/${(import.meta.env.VITE_WHATSAPP_NUMBER || '27718718052').replace(/[^0-9]/g, '')}?text=${encodeURIComponent(`Hello Grill Craft, I have placed order ${submittedOrder.id.slice(0, 8).toUpperCase()} for ${orderForm.quantity} x ${orderOffer.title}. Flavour: ${selectedFlavour}. Total: R${submittedOrder.totalRand.toFixed(2)}. Payment: ${paymentMethod.toUpperCase()}. Name: ${orderForm.customerName}. Please confirm my order.`)}`}> <MessageCircle size={16} /> Send order to WhatsApp <ArrowUpRight size={16} /></a>
                 <a className="text-order" href={'/track?order=' + encodeURIComponent(submittedOrder.id)}>Track this order</a>
                 <button className="dialog-done" onClick={() => setOrderInfoOpen(false)} data-testid="button-close-order-success">
                   Done <ArrowUpRight size={16} />
@@ -378,6 +382,15 @@ function PublicSite() {
                     </label>
                   </div>
                   <label className="sauce-option">
+                    <span>How would you like to order / pay?</span>
+                    <select value={paymentMethod} onChange={(event) => setPaymentMethod(event.target.value as typeof paymentMethod)}>
+                      <option value="whatsapp">WhatsApp order — confirm with Fred</option>
+                      <option value="cash">Cash on collection / delivery</option>
+                      <option value="eft">EFT / pay-to-account — request details on WhatsApp</option>
+                      <option value="yoco">Pay online with Yoco</option>
+                    </select>
+                  </label>
+                  <label className="sauce-option">
                     <span>Smothered-in-sauce dipping</span>
                     <select value={orderForm.sauceOption} onChange={(event) => setOrderForm({ ...orderForm, sauceOption: event.target.value })}>
                       <option value="none">No extra sauce</option>
@@ -394,6 +407,8 @@ function PublicSite() {
                       data-testid="input-order-notes"
                     />
                   </label>
+                  {paymentMethod === 'eft' && <p className="dialog-footnote">We’ll share the business’s verified bank details directly. Your order is only marked paid after the payment reflects.</p>}
+                  {paymentMethod === 'yoco' && <p className="dialog-footnote">Yoco online checkout will work once the merchant’s live API access is approved and configured.</p>}
                   {orderError && <p className="form-error" role="alert">{orderError}</p>}
                   <button className="dialog-done order-submit" type="submit" disabled={orderSubmitting} data-testid="button-submit-order">
                     {orderSubmitting ? <LoaderCircle size={17} className="spin" /> : <MessageCircle size={17} />}
