@@ -13,9 +13,8 @@ import {
 import type { ApiRequest, ApiResponse } from "../lib/_http";
 
 const flavours = new Set([
-  "Peri Peri",
-  "Spicy Texan",
-  "Sweet Moroccan",
+  "Mozambican Peri-Peri",
+  "Moroccan",
 ]);
 
 export default async function handler(req: ApiRequest, res: ApiResponse) {
@@ -48,6 +47,8 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
   const flavour = requiredText(body?.flavour, 40);
   const notes = optionalText(body?.notes, 1000);
   const dealId = optionalText(body?.dealId, 100);
+  const sauceOption = body?.sauceOption === "smothered" ? "smothered" : "none";
+  const itemType = body?.itemType === "whole_chicken" ? "whole_chicken" : "saturday_spread";
   const quantity = Number(body?.quantity);
 
   if (
@@ -68,15 +69,19 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
   try {
     const sql = database();
     const id = randomUUID();
+    const weekday = new Intl.DateTimeFormat("en-ZA", { weekday: "long", timeZone: "Africa/Johannesburg" }).format(new Date());
+    if (!dealId && itemType === "saturday_spread" && weekday !== "Friday") {
+      return fail(res, 409, "The Saturday Spread must be ordered on Friday.");
+    }
     const rows = dealId
       ? ((await sql`
           INSERT INTO orders (
             id, customer_name, phone, item_name, unit_price_rand, deal_id,
-            flavour, quantity, total_rand, notes, status
+            flavour, quantity, total_rand, notes, status, sauce_option
           )
           SELECT ${id}, ${customerName}, ${phone}, deals.title,
             deals.price_rand, deals.id, ${flavour}, ${quantity},
-            deals.price_rand * ${quantity}, ${notes}, 'new'
+            deals.price_rand * ${quantity}, ${notes}, 'new', ${sauceOption}
           FROM deals
           WHERE deals.id = ${dealId}
             AND deals.active = TRUE
@@ -85,20 +90,34 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
           RETURNING id, customer_name, phone, item_name, unit_price_rand,
             deal_id, flavour, quantity, total_rand, notes, status, created_at
         `) as OrderRow[])
-      : ((await sql`
-          INSERT INTO orders (
-            id, customer_name, phone, item_name, unit_price_rand, deal_id,
-            flavour, quantity, total_rand, notes, status
-          )
-          VALUES (
-            ${id}, ${customerName}, ${phone}, 'Saturday Spread', 200, NULL,
-            ${flavour}, ${quantity}, ${quantity * 200}, ${notes}, 'new'
-          )
-          RETURNING id, customer_name, phone, item_name, unit_price_rand,
-            deal_id, flavour, quantity, total_rand, notes, status, created_at
-        `) as OrderRow[]);
+      : itemType === "whole_chicken"
+        ? ((await sql`
+            INSERT INTO orders (
+              id, customer_name, phone, item_name, unit_price_rand, deal_id,
+              flavour, quantity, total_rand, notes, status, sauce_option
+            )
+            VALUES (
+              ${id}, ${customerName}, ${phone}, 'Whole Chicken', 170, NULL,
+              ${flavour}, ${quantity}, ${quantity * 170}, ${notes}, 'new', ${sauceOption}
+            )
+            RETURNING id, customer_name, phone, item_name, unit_price_rand,
+              deal_id, flavour, quantity, total_rand, notes, status, created_at
+          `) as OrderRow[])
+        : ((await sql`
+            INSERT INTO orders (
+              id, customer_name, phone, item_name, unit_price_rand, deal_id,
+              flavour, quantity, total_rand, notes, status, sauce_option
+            )
+            VALUES (
+              ${id}, ${customerName}, ${phone}, 'Saturday Spread', 220, NULL,
+              ${flavour}, ${quantity}, ${quantity * 220}, ${notes}, 'new', ${sauceOption}
+            )
+            RETURNING id, customer_name, phone, item_name, unit_price_rand,
+              deal_id, flavour, quantity, total_rand, notes, status, created_at
+          `) as OrderRow[]);
     if (!rows[0]) return fail(res, 409, "That deal is no longer available.");
-    return ok(res, { order: toOrder(rows[0]) }, 201);
+    await sql`INSERT INTO order_events (order_id, event_type, message) VALUES (${id}, 'created', 'Order received by Grill Craft')`;
+    return ok(res, { order: { ...toOrder(rows[0]), sauceOption, paymentStatus: "pending" } }, 201);
   } catch (error) {
     return publicError(res, error);
   }

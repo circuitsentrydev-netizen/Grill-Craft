@@ -50,6 +50,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
         deal_id, flavour, quantity, total_rand, notes, status, created_at
     `) as OrderRow[];
     if (!rows[0]) return fail(res, 404, "Order not found.");
+    await sql`INSERT INTO order_events (order_id, event_type, message) VALUES (${orderId}, ${status}, ${'Order status updated to ' + status})`;
     return ok(res, { order: toOrder(rows[0]) });
   } catch (error) {
     return publicError(res, error);
