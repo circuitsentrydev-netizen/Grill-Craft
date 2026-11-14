@@ -1,0 +1,14 @@
+{
+  "name": "Grill Craft",
+  "short_name": "Grill Craft",
+  "description": "Flame-grilled chicken and Saturday specials.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#251d19",
+  "theme_color": "#251d19",
+  "orientation": "portrait-primary",
+  "icons": [
+    { "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}
