@@ -23,7 +23,7 @@ export async function apiRequest<T>(
 
   if (!response.headers.get("content-type")?.includes("application/json")) {
     throw new ApiError(
-      "The order service is not available in this preview. Use the Vercel deployment after setup.",
+      "This Replit preview does not run the order API. Open the live Grill Craft site at https://grillscraftwenties.vercel.app to place an order.",
       response.status || 503,
     );
   }
