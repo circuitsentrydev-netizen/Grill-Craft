@@ -115,7 +115,7 @@ export default async function handler(req: IncomingMessage, res: ApiResponse) {
         await sql`
           UPDATE orders
           SET payment_status = 'paid',
-              payment_reference = ${event.payload.id || checkoutId},
+              payment_reference = ${checkoutId},
               updated_at = NOW()
           WHERE id = ${order.id}
         `;
