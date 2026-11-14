@@ -291,6 +291,11 @@ function PublicSite() {
       <footer className="site-footer">
         <a className="footer-brand" href="#top" data-testid="link-footer-home">GRILL CRAFT <span>(PTY) LTD.</span></a>
         <p>Flame-grilled chicken, made for sharing.</p>
+        <div className="footer-contact">
+          <a href={`https://wa.me/${(import.meta.env.VITE_WHATSAPP_NUMBER || '27718718052').replace(/[^0-9]/g, '')}`} target="_blank" rel="noreferrer">WhatsApp Fred · +27 71 871 8052</a>
+          <span>Pickup: 12 Burgers Road, Austerville, Durban, 4052</span>
+          <span>Delivery: orders over R200 in Wentworth, Bluff and Merebank. Other areas quoted by distance.</span>
+        </div>
         <div className="footer-utility">
           <a className="footer-admin" href="/track">Track order</a>
           <a className="footer-admin" href="/admin" data-testid="link-admin">Admin</a>
