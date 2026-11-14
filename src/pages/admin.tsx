@@ -41,6 +41,7 @@ type Deal = {
 };
 
 type Admin = { email: string };
+type ManualOrderForm = { customerName: string; phone: string; itemName: string; unitPriceRand: string; quantity: string; flavour: string; paymentMethod: 'cash' | 'eft' | 'whatsapp'; notes: string };
 type ApiMessage = { error?: string; message?: string };
 type DealForm = {
   title: string;
@@ -69,6 +70,8 @@ const statusLabels: Record<OrderStatus, string> = {
   completed: 'Completed',
   cancelled: 'Cancelled',
 };
+
+const emptyManualOrder: ManualOrderForm = { customerName: '', phone: '', itemName: '', unitPriceRand: '', quantity: '1', flavour: 'Mozambican Peri-Peri', paymentMethod: 'whatsapp', notes: '' };
 
 const emptyDeal: DealForm = {
   title: '',
@@ -149,6 +152,8 @@ function AdminPage() {
   const [ordersError, setOrdersError] = useState('');
   const [dealsError, setDealsError] = useState('');
   const [dealForm, setDealForm] = useState<DealForm>(emptyDeal);
+  const [manualOrder, setManualOrder] = useState<ManualOrderForm>(emptyManualOrder);
+  const [manualOrderPending, setManualOrderPending] = useState(false);
   const [dealErrors, setDealErrors] = useState<Record<string, string>>({});
   const [dealPending, setDealPending] = useState(false);
   const [savingOrder, setSavingOrder] = useState<string | null>(null);
@@ -308,6 +313,33 @@ function AdminPage() {
       }
     } finally {
       setSavingOrder(null);
+    }
+  };
+
+  const handleManualOrder = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setNotice('');
+    setNoticeError(false);
+    setManualOrderPending(true);
+    try {
+      await apiRequest<{ order: Order }>('/api/admin/orders', {
+        method: 'POST',
+        body: JSON.stringify({
+          ...manualOrder,
+          quantity: Number(manualOrder.quantity),
+          unitPriceRand: Number(manualOrder.unitPriceRand),
+        }),
+      });
+      setManualOrder(emptyManualOrder);
+      setNotice('Order added to the order rail.');
+      await refreshLists();
+    } catch (error) {
+      if (!handleUnauthorized(error)) {
+        setNotice(error instanceof Error ? error.message : 'Order could not be added.');
+        setNoticeError(true);
+      }
+    } finally {
+      setManualOrderPending(false);
     }
   };
 
@@ -587,6 +619,63 @@ function AdminPage() {
           </section>
 
           <aside className="gc-side-column">
+            <section className="gc-panel gc-deal-form-panel" aria-labelledby="gc-manual-order-title">
+              <div className="gc-panel-heading gc-deal-heading">
+                <div>
+                  <p className="gc-section-index">02 / COUNTER ENTRY</p>
+                  <h2 id="gc-manual-order-title">Add an order</h2>
+                  <p>Record phone, WhatsApp and walk-in orders here.</p>
+                </div>
+                <span className="gc-deal-icon"><Plus size={19} aria-hidden="true" /></span>
+              </div>
+              <form className="gc-deal-form" onSubmit={handleManualOrder}>
+                <div className="gc-field">
+                  <label htmlFor="manual-customer">Customer name</label>
+                  <input id="manual-customer" required maxLength={100} value={manualOrder.customerName} onChange={(event) => setManualOrder({ ...manualOrder, customerName: event.target.value })} />
+                </div>
+                <div className="gc-field">
+                  <label htmlFor="manual-phone">Phone number</label>
+                  <input id="manual-phone" required type="tel" maxLength={32} value={manualOrder.phone} onChange={(event) => setManualOrder({ ...manualOrder, phone: event.target.value })} />
+                </div>
+                <div className="gc-field">
+                  <label htmlFor="manual-item">Item ordered</label>
+                  <input id="manual-item" required maxLength={100} value={manualOrder.itemName} onChange={(event) => setManualOrder({ ...manualOrder, itemName: event.target.value })} placeholder="e.g. Whole Chicken" />
+                </div>
+                <div className="gc-field-row">
+                  <div className="gc-field">
+                    <label htmlFor="manual-price">Unit price (R)</label>
+                    <input id="manual-price" required type="number" min="0.01" step="0.01" value={manualOrder.unitPriceRand} onChange={(event) => setManualOrder({ ...manualOrder, unitPriceRand: event.target.value })} />
+                  </div>
+                  <div className="gc-field">
+                    <label htmlFor="manual-quantity">Quantity</label>
+                    <input id="manual-quantity" required type="number" min="1" max="20" step="1" value={manualOrder.quantity} onChange={(event) => setManualOrder({ ...manualOrder, quantity: event.target.value })} />
+                  </div>
+                </div>
+                <div className="gc-field-row">
+                  <div className="gc-field">
+                    <label htmlFor="manual-flavour">Flavour</label>
+                    <select id="manual-flavour" value={manualOrder.flavour} onChange={(event) => setManualOrder({ ...manualOrder, flavour: event.target.value })}>
+                      <option>Mozambican Peri-Peri</option><option>Moroccan</option>
+                    </select>
+                  </div>
+                  <div className="gc-field">
+                    <label htmlFor="manual-payment">Payment method</label>
+                    <select id="manual-payment" value={manualOrder.paymentMethod} onChange={(event) => setManualOrder({ ...manualOrder, paymentMethod: event.target.value as ManualOrderForm['paymentMethod'] })}>
+                      <option value="whatsapp">WhatsApp</option><option value="cash">Cash</option><option value="eft">EFT</option>
+                    </select>
+                  </div>
+                </div>
+                <div className="gc-field">
+                  <label htmlFor="manual-notes">Order notes</label>
+                  <textarea id="manual-notes" rows={2} maxLength={1000} value={manualOrder.notes} onChange={(event) => setManualOrder({ ...manualOrder, notes: event.target.value })} />
+                </div>
+                <button className="gc-button gc-button-primary gc-create-button" type="submit" disabled={manualOrderPending}>
+                  {manualOrderPending ? 'Adding order…' : <><Plus size={17} /> Add to order rail</>}
+                </button>
+              </form>
+            </section>
+
+
             <section className="gc-panel gc-deal-form-panel" aria-labelledby="gc-create-deal-title">
               <div className="gc-panel-heading gc-deal-heading">
                 <div>
