@@ -59,12 +59,12 @@ export default async function handler(req: IncomingMessage, res: ApiResponse) {
     const order = existing[0] as { id: string; total_rand: number | string; yoco_checkout_id: string | null } | undefined;
     if (!order) return res.status(200).json({ received: true, ignored: true });
     const checkoutId = event.payload.checkoutId || event.payload.id;
-    if (checkoutId && order.yoco_checkout_id && checkoutId !== order.yoco_checkout_id) {
+    if (!checkoutId || !order.yoco_checkout_id || checkoutId !== order.yoco_checkout_id) {
       return res.status(400).json({ error: "Checkout reference mismatch." });
     }
     if (event.type === "payment.succeeded") {
-      if (event.payload.currency && event.payload.currency !== "ZAR") return res.status(400).json({ error: "Currency mismatch." });
-      if (typeof event.payload.amount === "number" && event.payload.amount !== Math.round(Number(order.total_rand) * 100)) {
+      if (event.payload.currency !== "ZAR") return res.status(400).json({ error: "Currency mismatch." });
+      if (typeof event.payload.amount !== "number" || event.payload.amount !== Math.round(Number(order.total_rand) * 100)) {
         return res.status(400).json({ error: "Payment amount mismatch." });
       }
       const inserted = (await sql`
