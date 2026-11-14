@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from 'react';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { ArrowDown, ArrowUpRight, Check, Flame, LoaderCircle, Menu, MessageCircle, X } from 'lucide-react';
 import { Route, Switch } from 'wouter';
 import AdminPage from '@/pages/admin';
@@ -79,6 +79,14 @@ function PublicSite() {
       active = false;
     };
   }, []);
+
+  const handleWholeChicken = () => {
+    setMenuOpen(false);
+    setSubmittedOrder(null);
+    setOrderError('');
+    setOrderOffer({ id: null, title: 'Whole Chicken', priceRand: 170 });
+    setOrderInfoOpen(true);
+  };
 
   const handleOrder = (deal?: Deal) => {
     setMenuOpen(false);
@@ -267,9 +275,12 @@ function PublicSite() {
           <h2 id="closing-title">The good part<br />starts <em>at the table.</em></h2>
         </div>
         <div className="closing-action">
-          <p>Saturday Spread · R200</p>
+          <p>Saturday Spread · R220</p>
           <button className="text-order" onClick={() => handleOrder()} data-testid="button-order-footer">
             Order by Friday <ArrowUpRight size={17} aria-hidden="true" />
+          </button>
+          <button className="text-order" onClick={handleWholeChicken} data-testid="button-order-whole-chicken">
+            Whole chicken · R170 <ArrowUpRight size={17} aria-hidden="true" />
           </button>
         </div>
       </section>
@@ -279,6 +290,8 @@ function PublicSite() {
         <p>Flame-grilled chicken, made for sharing.</p>
         <div className="footer-utility">
           <a className="footer-admin" href="/track">Track order</a>
+          <a className="footer-admin" href="/privacy">Privacy</a>
+          <a className="footer-admin" href="/refunds">Returns & refunds</a>
           <a className="footer-admin" href="/admin" data-testid="link-admin">Admin</a>
           <span className="footer-mark" aria-hidden="true">GC—02</span>
         </div>
@@ -411,6 +424,7 @@ function TrackPage() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
+  const lastKnownOrder = useRef<{ status: string; paymentStatus: string } | null>(null);
 
   const loadOrder = async (silent = false) => {
     if (!orderId.trim() || !phone.trim()) return;
@@ -419,9 +433,14 @@ function TrackPage() {
       const result = await apiRequest<{ order: NonNullable<typeof order>; events: typeof events }>(
         '/api/orders/track?id=' + encodeURIComponent(orderId.trim()) + '&phone=' + encodeURIComponent(phone.trim())
       );
-      if (order && result.order.status !== order.status && notificationsEnabled && 'Notification' in window && Notification.permission === 'granted') {
-        new Notification('Grill Craft order update', { body: 'Your order is now ' + result.order.status + '.' });
+      const previous = lastKnownOrder.current;
+      if (previous && (result.order.status !== previous.status || result.order.paymentStatus !== previous.paymentStatus) && notificationsEnabled && 'Notification' in window && Notification.permission === 'granted') {
+        const message = result.order.status !== previous.status
+          ? 'Your order is now ' + result.order.status + '.'
+          : 'Your payment is now ' + result.order.paymentStatus + '.';
+        new Notification('Grill Craft order update', { body: message });
       }
+      lastKnownOrder.current = { status: result.order.status, paymentStatus: result.order.paymentStatus };
       setOrder(result.order);
       setEvents(result.events);
       setError('');
@@ -475,7 +494,7 @@ function TrackPage() {
           <ol className="tracking-events">{events.map((event, index) => <li key={event.event_type + event.created_at + index}><strong>{event.message}</strong><time>{new Date(event.created_at).toLocaleString('en-ZA')}</time></li>)}</ol>
         </section>}
       </section>
-      <footer className="site-footer"><a className="footer-brand" href="/">GRILL CRAFT <span>(PTY) LTD.</span></a><p>Flame-grilled chicken, made for sharing.</p><a href="/admin">Admin</a></footer>
+      <footer className="site-footer"><a className="footer-brand" href="/">GRILL CRAFT <span>(PTY) LTD.</span></a><p>Flame-grilled chicken, made for sharing.</p><div className="footer-utility"><a href="/privacy">Privacy</a><a href="/refunds">Returns &amp; refunds</a><a href="/admin">Admin</a></div></footer>
     </main>
   );
 }
